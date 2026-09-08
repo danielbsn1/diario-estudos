@@ -3,6 +3,16 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* paleta de gráficos (dataviz) */
+  --chart-cat-1: #2a78d6; /* Estudo - azul */
+  --chart-cat-2: #eb6834; /* Trabalho - laranja */
+  --chart-cat-3: #1baf7a; /* Pessoal - água */
+  --chart-cat-4: #eda100; /* Outro - amarelo */
+  --chart-sequential: #2a78d6;
+  --chart-grid: #e1e0d9;
+  --chart-baseline: #c3c2b7;
+  --chart-muted: #898781;
 }
 
 @theme inline {
@@ -16,6 +26,15 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+
+    --chart-cat-1: #3987e5;
+    --chart-cat-2: #d95926;
+    --chart-cat-3: #199e70;
+    --chart-cat-4: #c98500;
+    --chart-sequential: #3987e5;
+    --chart-grid: #2c2c2a;
+    --chart-baseline: #383835;
+    --chart-muted: #898781;
   }
 }
 
