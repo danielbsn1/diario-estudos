@@ -70,7 +70,12 @@ export function formatarDataCurta(iso: string): string {
 }
 
 export function formatarHoras(horas: number): string {
-  return horas % 1 === 0 ? `${horas}h` : `${horas.toFixed(1)}h`;
+  const totalMinutos = Math.round(horas * 60);
+  const h = Math.floor(totalMinutos / 60);
+  const m = totalMinutos % 60;
+  if (h === 0) return `${m}min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}min`;
 }
 
 export function formatarHora(hhmmss: string): string {

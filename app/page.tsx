@@ -1,26 +1,30 @@
 import Link from "next/link";
-import { estatisticasDashboard } from "@/lib/data";
-import { CATEGORIAS } from "@/lib/types";
-import { NOMES_DIA_SEMANA_CURTO, formatarData, formatarDataCurta, formatarHoras } from "@/lib/date";
+import { estatisticasDashboard, relatorioSemanal } from "@/lib/data";
+import {
+  NOMES_DIA_SEMANA,
+  NOMES_DIA_SEMANA_CURTO,
+  formatarData,
+  formatarHoras,
+  inicioDaSemana,
+  isoDeHoje,
+  somarDias,
+} from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 
-const COR_CATEGORIA: Record<string, string> = {
-  [CATEGORIAS[0]]: "var(--chart-cat-1)",
-  [CATEGORIAS[1]]: "var(--chart-cat-2)",
-  [CATEGORIAS[2]]: "var(--chart-cat-3)",
-  [CATEGORIAS[3]]: "var(--chart-cat-4)",
-};
+export default async function DashboardPage(props: PageProps<"/">) {
+  const searchParams = await props.searchParams;
+  const semanaParam = typeof searchParams.semana === "string" ? searchParams.semana : undefined;
+  const segunda = inicioDaSemana(semanaParam ?? isoDeHoje());
+  const semanaAtual = inicioDaSemana(isoDeHoje());
+  const semanaAnterior = somarDias(segunda, -7);
+  const proximaSemana = somarDias(segunda, 7);
 
-export default async function DashboardPage() {
-  const stats = await estatisticasDashboard();
+  const [stats, relatorio] = await Promise.all([estatisticasDashboard(), relatorioSemanal(segunda)]);
 
-  const maxDia = Math.max(1, ...stats.porDia.map((d) => d.horas));
-  const maxCategoria = Math.max(1, ...stats.porCategoria.map((c) => c.horas));
-  const diaComMaisHoras = stats.porDia.reduce(
-    (melhor, atual) => (atual.horas > melhor.horas ? atual : melhor),
-    stats.porDia[0]
-  );
+  const maxTotalDia = Math.max(1, ...relatorio.dias.map((d) => d.total));
+  const corPorMateria = new Map(relatorio.porMateria.map((m) => [m.materiaId, m.cor]));
+  const hoje = isoDeHoje();
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-10 sm:py-16">
@@ -59,96 +63,99 @@ export default async function DashboardPage() {
       )}
 
       <figure className="flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
-        <figcaption className="text-sm font-semibold text-black dark:text-zinc-50">
-          Horas nos últimos 14 dias
-        </figcaption>
+        <div className="flex items-center justify-between">
+          <figcaption className="text-sm font-semibold text-black dark:text-zinc-50">
+            Relatório semanal
+          </figcaption>
+          <div className="flex items-center gap-3 text-xs">
+            <Link
+              href={`/?semana=${semanaAnterior}`}
+              className="font-medium text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-zinc-50"
+            >
+              ← Anterior
+            </Link>
+            <span className="text-zinc-500 dark:text-zinc-400">
+              {formatarData(segunda)} – {formatarData(relatorio.domingo)}
+            </span>
+            <Link
+              href={`/?semana=${proximaSemana}`}
+              className="font-medium text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-zinc-50"
+            >
+              Próxima →
+            </Link>
+          </div>
+        </div>
+        {segunda !== semanaAtual && (
+          <Link href="/" className="-mt-2 text-xs text-blue-600 underline dark:text-blue-400">
+            voltar para esta semana
+          </Link>
+        )}
 
-        <div className="flex h-28 items-end gap-1.5 border-b" style={{ borderColor: "var(--chart-baseline)" }}>
-          {stats.porDia.map((d) => {
-            const altura = Math.max(2, (d.horas / maxDia) * 100);
-            const ehDestaque = d.data === diaComMaisHoras?.data && d.horas > 0;
-            return (
-              <div key={d.data} className="flex flex-1 flex-col items-center justify-end gap-1">
-                {ehDestaque && (
-                  <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
-                    {formatarHoras(d.horas)}
-                  </span>
+        <div className="flex h-32 items-end gap-2">
+          {relatorio.dias.map((d) => (
+            <div key={d.data} className="flex flex-1 flex-col items-center justify-end gap-1">
+              <span className="text-[10px] font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
+                {d.total > 0 ? formatarHoras(d.total) : ""}
+              </span>
+              <div
+                title={`${formatarData(d.data)}: ${formatarHoras(d.total)}`}
+                className="flex w-full flex-col-reverse gap-0.5 overflow-hidden rounded-t"
+                style={{ height: `${Math.max(3, (d.total / maxTotalDia) * 100)}%` }}
+              >
+                {d.total > 0 ? (
+                  d.porMateria.map((seg) => (
+                    <div
+                      key={seg.materiaId}
+                      className="w-full"
+                      style={{
+                        flexGrow: seg.horas,
+                        backgroundColor: corPorMateria.get(seg.materiaId) ?? "var(--chart-muted)",
+                      }}
+                    />
+                  ))
+                ) : (
+                  <div className="w-full flex-1" style={{ backgroundColor: "var(--chart-grid)" }} />
                 )}
-                <div
-                  title={`${formatarData(d.data)}: ${formatarHoras(d.horas)}`}
-                  className="w-full rounded-t"
-                  style={{
-                    height: `${altura}%`,
-                    backgroundColor: "var(--chart-sequential)",
-                    opacity: d.horas === 0 ? 0.15 : 1,
-                  }}
-                />
               </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          {relatorio.dias.map((d) => {
+            const diaSemana = new Date(d.data + "T00:00:00").getDay();
+            return (
+              <span
+                key={d.data}
+                className={
+                  "flex-1 text-center text-[10px] " +
+                  (d.data === hoje
+                    ? "font-semibold text-blue-600 dark:text-blue-400"
+                    : "text-zinc-500 dark:text-zinc-400")
+                }
+              >
+                {NOMES_DIA_SEMANA_CURTO[diaSemana]}
+              </span>
             );
           })}
         </div>
-        <div className="flex gap-1.5">
-          {stats.porDia.map((d) => (
-            <span
-              key={d.data}
-              className="flex-1 text-center text-[10px] text-zinc-500 dark:text-zinc-400"
-            >
-              {NOMES_DIA_SEMANA_CURTO[new Date(d.data + "T00:00:00").getDay()][0]}
-            </span>
-          ))}
-        </div>
 
-        <details className="text-xs text-zinc-500 dark:text-zinc-400">
-          <summary className="cursor-pointer">Ver como tabela</summary>
-          <table className="mt-2 w-full text-left">
-            <thead>
-              <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                <th className="py-1 font-medium">Data</th>
-                <th className="py-1 font-medium">Horas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.porDia.map((d) => (
-                <tr key={d.data}>
-                  <td className="py-0.5">{formatarDataCurta(d.data)}</td>
-                  <td className="py-0.5 tabular-nums">{formatarHoras(d.horas)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </details>
-      </figure>
-
-      <figure className="flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
-        <figcaption className="text-sm font-semibold text-black dark:text-zinc-50">
-          Horas por categoria (este mês)
-        </figcaption>
-
-        {stats.porCategoria.length === 0 ? (
+        {relatorio.porMateria.length === 0 ? (
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Nenhum registro este mês ainda.
+            Nenhum registro nesta semana ainda.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {stats.porCategoria.map((c) => (
-              <div key={c.categoria} className="flex flex-col gap-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                    {c.categoria}
-                  </span>
-                  <span className="tabular-nums text-zinc-500 dark:text-zinc-400">
-                    {formatarHoras(c.horas)}
-                  </span>
-                </div>
-                <div className="h-2 w-full rounded-full" style={{ backgroundColor: "var(--chart-grid)" }}>
-                  <div
-                    className="h-2 rounded-full"
-                    style={{
-                      width: `${Math.max(4, (c.horas / maxCategoria) * 100)}%`,
-                      backgroundColor: COR_CATEGORIA[c.categoria],
-                    }}
-                  />
-                </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+            {relatorio.porMateria.map((m) => (
+              <div key={m.materiaId} className="flex items-center gap-1.5 text-xs">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: m.cor }}
+                  aria-hidden
+                />
+                <span className="text-zinc-700 dark:text-zinc-300">{m.nome}</span>
+                <span className="tabular-nums text-zinc-500 dark:text-zinc-400">
+                  {formatarHoras(m.horas)}
+                </span>
               </div>
             ))}
           </div>
@@ -159,15 +166,17 @@ export default async function DashboardPage() {
           <table className="mt-2 w-full text-left">
             <thead>
               <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                <th className="py-1 font-medium">Categoria</th>
+                <th className="py-1 font-medium">Dia</th>
                 <th className="py-1 font-medium">Horas</th>
               </tr>
             </thead>
             <tbody>
-              {stats.porCategoria.map((c) => (
-                <tr key={c.categoria}>
-                  <td className="py-0.5">{c.categoria}</td>
-                  <td className="py-0.5 tabular-nums">{formatarHoras(c.horas)}</td>
+              {relatorio.dias.map((d) => (
+                <tr key={d.data}>
+                  <td className="py-0.5">
+                    {NOMES_DIA_SEMANA[new Date(d.data + "T00:00:00").getDay()]} ({formatarData(d.data)})
+                  </td>
+                  <td className="py-0.5 tabular-nums">{formatarHoras(d.total)}</td>
                 </tr>
               ))}
             </tbody>

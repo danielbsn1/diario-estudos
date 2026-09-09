@@ -1,9 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
-import type { BlocoCronograma, Registro, SessaoPlanejada } from "@/lib/types";
+import type { BlocoCronograma, Materia, Registro } from "@/lib/types";
 
 type Database = {
   public: {
     Tables: {
+      materias: {
+        Row: Materia;
+        Insert: Omit<Materia, "id">;
+        Update: Partial<Materia>;
+        Relationships: [];
+      };
       registros: {
         Row: Registro;
         Insert: Omit<Registro, "id" | "created_at" | "origem_tipo" | "origem_id" | "observacoes"> &
@@ -15,13 +21,6 @@ type Database = {
         Row: BlocoCronograma;
         Insert: Omit<BlocoCronograma, "id" | "ativo"> & Partial<Pick<BlocoCronograma, "ativo">>;
         Update: Partial<BlocoCronograma>;
-        Relationships: [];
-      };
-      sessoes_planejadas: {
-        Row: SessaoPlanejada;
-        Insert: Omit<SessaoPlanejada, "id" | "concluida" | "registro_id"> &
-          Partial<Pick<SessaoPlanejada, "concluida" | "registro_id">>;
-        Update: Partial<SessaoPlanejada>;
         Relationships: [];
       };
     };
